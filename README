@@ -1,1 +1,3 @@
 = joos: Jiannan Ouyang Operating System =
+
+boot/: simple boot loader which load the kernel from 1st sector of 1st disk
