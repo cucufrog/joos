@@ -24,6 +24,7 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "btrace", "Display stack backtrace", mon_backtrace },
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -59,7 +60,47 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
+        int i;
+        uint32_t *ebp, *eip;
+        struct Eipdebuginfo info;
+
+        ebp = (uint32_t *)read_ebp();
+        eip = (uint32_t *)read_eip();
+
 	// Your code here.
+        cprintf("===== Stack Backrace =====\n");
+
+        while (ebp != NULL) {
+            // print filename:line number: <function name>
+            if (debuginfo_eip((uintptr_t)eip, &info) == -1) {
+                cprintf("error!!\n");
+            }
+            cprintf("%s:%d: %.*s", 
+                    info.eip_file, 
+                    info.eip_line, 
+                    info.eip_fn_namelen, info.eip_fn_name);
+
+            // print (args)
+            cprintf("(");
+            if (info.eip_fn_narg != 0) {
+                for ( i=1; i<=info.eip_fn_narg; ++i){
+                    if (i != 1) cprintf(" ,");
+                    cprintf("%x", *(ebp-i));
+                }
+            }
+            cprintf(")");
+
+            // print ebp, eip and args
+            cprintf(" <ebp:%x, eip:%x>", (uint32_t)ebp, (uint32_t)eip);
+            cprintf("\n");
+
+            
+            ebp = (uint32_t *)*ebp;
+            eip = (uint32_t *)*(ebp + 1);
+
+        }
+
+        cprintf("===== Backtrace End =====\n");
 	return 0;
 }
 
@@ -114,12 +155,14 @@ monitor(struct Trapframe *tf)
 {
 	char *buf;
 
-	cprintf("Welcome to the JOS kernel monitor!\n");
-	cprintf("Type 'help' for a list of commands.\n");
+	cprintf("*********************************************\n");
+	cprintf("*     Welcome to the JOOS kernel monitor!    *\n");
+	cprintf("*     Type 'help' for a list of commands.   *\n");
+	cprintf("*********************************************\n");
 
 
 	while (1) {
-		buf = readline("K> ");
+		buf = readline("joos> ");
 		if (buf != NULL)
 			if (runcmd(buf, tf) < 0)
 				break;

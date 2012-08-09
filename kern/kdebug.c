@@ -41,7 +41,7 @@ extern const char __STABSTR_END__[];		// End of string table
 //		118    SO     f0100178
 //		555    SO     f0100652
 //		556    SO     f0100654
-//		657    SO     f0100849
+//		661    SO     f0100849
 //	this code:
 //		left = 0, right = 657;
 //		stab_binsearch(stabs, &left, &right, N_SO, 0xf0100184);
@@ -179,6 +179,12 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 	//	Look at the STABS documentation and <inc/stab.h> to find
 	//	which one.
 	// Your code here.
+	stab_binsearch(stabs, &lline, &rline, N_SLINE, addr);
+        if (lline <= rline) {
+            info->eip_line = stabs[lline].n_desc;
+        } else {
+            return -1;
+        }
 
 	
 	// Search backwards from the line number for the relevant filename
