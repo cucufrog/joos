@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // Simple command-line kernel monitor useful for
 // controlling the kernel and exploring the system interactively.
 
