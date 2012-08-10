@@ -32,13 +32,17 @@ unsigned read_eip();
 
 /***** Implementations of basic kernel monitor commands *****/
 
+static void 
+__mon_help(void)
+{
+    int i;
+    for (i = 0; i < NCOMMANDS; i++)
+        cprintf("%s - %s\n", commands[i].name, commands[i].desc);
+}
 int
 mon_help(int argc, char **argv, struct Trapframe *tf)
 {
-	int i;
-
-	for (i = 0; i < NCOMMANDS; i++)
-		cprintf("%s - %s\n", commands[i].name, commands[i].desc);
+        __mon_help();
 	return 0;
 }
 
@@ -57,9 +61,8 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
-int
-mon_backtrace(int argc, char **argv, struct Trapframe *tf)
-{
+void
+backtrace(void){
         int i;
         uint32_t *ebp, *eip;
         struct Eipdebuginfo info;
@@ -101,6 +104,12 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
         }
 
         cprintf("===== Backtrace End =====\n");
+
+}
+int
+mon_backtrace(int argc, char **argv, struct Trapframe *tf)
+{
+        backtrace();
 	return 0;
 }
 
@@ -146,7 +155,8 @@ runcmd(char *buf, struct Trapframe *tf)
 		if (strcmp(argv[0], commands[i].name) == 0)
 			return commands[i].func(argc, argv, tf);
 	}
-	cprintf("Unknown command '%s'\n", argv[0]);
+	cprintf("Error: unknown command '%s'. Available commands are:\n", argv[0]);
+        __mon_help();
 	return 0;
 }
 

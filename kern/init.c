@@ -6,6 +6,8 @@
 
 #include <kern/monitor.h>
 #include <kern/console.h>
+#include <kern/pmap.h>
+#include <kern/kclock.h>
 
 // Test the stack backtrace function (lab 1 only)
 void
@@ -35,6 +37,8 @@ i386_init(void)
 	cprintf("JOOS: init console ...\n");
 
 	//test_backtrace(5);
+	cprintf("JOOS: init MMU ...\n");
+        mem_init();
 
 	// Drop into the kernel monitor.
 	cprintf("JOOS: start monitor ...\n");
@@ -53,6 +57,7 @@ static const char *panicstr;
  * Panic is called on unresolvable fatal errors.
  * It prints "panic: mesg", and then enters the kernel monitor.
  */
+extern void backtrace(void);
 void
 _panic(const char *file, int line, const char *fmt,...)
 {
@@ -70,6 +75,8 @@ _panic(const char *file, int line, const char *fmt,...)
 	vcprintf(fmt, ap);
 	cprintf("\n");
 	va_end(ap);
+
+        backtrace();
 
 dead:
 	/* break into the kernel monitor */
