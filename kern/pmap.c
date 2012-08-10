@@ -19,6 +19,8 @@ struct Page *pages;		// Physical page state array
 static struct Page *page_free_list;	// Free list of physical pages
 
 
+extern void print_pgdir(void);
+
 // --------------------------------------------------------------
 // Detect machine's physical memory setup.
 // --------------------------------------------------------------
@@ -129,6 +131,7 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
 	kern_pgdir = (pde_t *) boot_alloc(PGSIZE);
+        //print_pgdir();
 	memset(kern_pgdir, 0, PGSIZE);
 
 	//////////////////////////////////////////////////////////////////////
@@ -139,7 +142,9 @@ mem_init(void)
 
 	// Permissions: kernel R, user R
 	kern_pgdir[PDX(UVPT)] = PADDR(kern_pgdir) | PTE_U | PTE_P;
-
+        //cprintf("debug pgdir %x\n", kern_pgdir);
+        //print_pgdir();
+ 
 	//////////////////////////////////////////////////////////////////////
 	// Allocate an array of npages 'struct Page's and store it in 'pages'.
 	// The kernel uses this array to keep track of physical pages: for
@@ -171,6 +176,7 @@ mem_init(void)
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
+        boot_map_region(kern_pgdir, (uintptr_t) UPAGES, npages * sizeof(struct Page), PADDR(pages), PTE_W | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -183,6 +189,7 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
+        boot_map_region(kern_pgdir, (uintptr_t) KSTACKTOP -KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
@@ -192,6 +199,7 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+        boot_map_region(kern_pgdir, (uintptr_t) KERNBASE, 0xffffffff - KERNBASE, 0x0, PTE_W | PTE_P);
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -368,7 +376,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
             pp->pp_ref++;
 
             // insert page table into pgdir
-            pde = page2pa(pp) | PTE_P | PTE_U;
+            pde = page2pa(pp) | PTE_P | PTE_W;
             pgdir[PDX(va)] = pde;
 
             //cprintf("debug: pgdir_walk: PTE_ADDR %x\n", pde);
@@ -398,12 +406,12 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
         size_t i=0;
 
         while (i<size) {
-            pte_t *ppte = pgdir_walk(pgdir, (void *)va, 1);
+            pte_t *ppte = pgdir_walk(pgdir, (void *)(va+i), 1);
             if (ppte == NULL) panic("boot_map_region: NULL pte pointer!");
 
-            *ppte = (pa + i*PGSIZE) | perm | PTE_P;
+            *ppte = (pa + i) | perm | PTE_P;
 
-            i++;
+            i+=PGSIZE;
         }
 }
 
@@ -448,13 +456,15 @@ page_insert(pde_t *pgdir, struct Page *pp, void *va, int perm)
             //*ppte &= ~PTE_P;
             if (pa2page(PTE_ADDR(*ppte)) != pp) {
                 page_remove(pgdir, va);
-                tlb_invalidate(pgdir, va);
-            } else
+            } else {
                 pp->pp_ref--;
+            }
         }
+        pgdir[PDX(va)] |= perm;
         *ppte = page2pa(pp) | perm | PTE_P;
         //warn("insert %x!!! perm %x\n", *ppte, perm);
         pp->pp_ref++;
+        tlb_invalidate(pgdir, va);
 	return 0;
 }
 
@@ -515,10 +525,11 @@ page_remove(pde_t *pgdir, void *va)
         }
         //cprintf("debug: hehe *ppte %x\n", *ppte);
         pp = pa2page(PTE_ADDR(*ppte));
-        pp->pp_ref--;
+        //pp->pp_ref--;
         //cprintf("debug: %x: %d\n", pp, pp->pp_ref);
-        if (pp->pp_ref == 0)
-            page_free(pp);
+        //if (pp->pp_ref == 0)
+        //    page_free(pp);
+        page_decref(pp);
         *ppte &= ~PTE_P;
         tlb_invalidate(pgdir, va);
         

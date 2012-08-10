@@ -10,6 +10,7 @@
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
+#include <kern/pmap.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
@@ -25,6 +26,7 @@ static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "btrace", "Display stack backtrace", mon_backtrace },
+	{ "pgdir", "Print page directory", mon_pgdir },
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -106,10 +108,49 @@ backtrace(void){
         cprintf("===== Backtrace End =====\n");
 
 }
+
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
         backtrace();
+	return 0;
+}
+
+void 
+print_pgdir()
+{
+    //pde_t *kern_pgdir = (pde_t *) UVPT;
+    extern pde_t *kern_pgdir;
+    size_t pdx, ptx;
+
+    //kern_pgdir = (pde_t *)PADDR(kern_pgdir);
+    cprintf(" pdx\t va\tpa\t\tperm\n");
+    for (pdx=0; pdx<NPDENTRIES; ++pdx) {
+        pde_t pgtbl = kern_pgdir[pdx];
+        if (pgtbl & PTE_P) {
+            uintptr_t va = pdx << 22;
+            physaddr_t pa = PTE_ADDR(pgtbl);
+            size_t perm = pgtbl & 0xfff;
+            cprintf("%4d\t%x\t%x\t%x\n", pdx, va, pa, perm);
+            /*
+            for (ptx=0; ptx<NPTENTRIES; ++ptx) {
+                pte_t pte = ((pte_t *)PTE_ADDR(pgtbl))[ptx];
+                if (pte & PTE_P) {
+                    physaddr_t pa = PTE_ADDR(pte);
+                    size_t perm = pte & 0xfff;
+                    uintptr_t va = pdx << 22 | ptx << 12;
+                    cprintf("%4d\t%4d\t%x\t%x\t%x\n", pdx, ptx, va, pa, perm);
+                }
+            }
+            */
+        }
+    }
+    
+}
+int
+mon_pgdir(int argc, char **argv, struct Trapframe *tf)
+{
+        print_pgdir();
 	return 0;
 }
 
