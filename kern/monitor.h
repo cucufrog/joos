@@ -19,7 +19,7 @@ int mon_pgdir(int argc, char **argv, struct Trapframe *tf);
 
 // utils
 void print_pgdir(void);
-void backtrace(void);
+void print_backtrace(void);
 
 
 #endif	// !JOS_KERN_MONITOR_H

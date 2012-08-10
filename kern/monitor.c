@@ -10,6 +10,7 @@
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
+#include <kern/trap.h>
 #include <kern/pmap.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
@@ -26,7 +27,7 @@ static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "btrace", "Display stack backtrace", mon_backtrace },
-	{ "pgdir", "Print page directory", mon_pgdir },
+	{ "pgdir", "Display page directory", mon_pgdir },
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -39,7 +40,7 @@ __mon_help(void)
 {
     int i;
     for (i = 0; i < NCOMMANDS; i++)
-        cprintf("%s - %s\n", commands[i].name, commands[i].desc);
+        cprintf("* %s - %s\n", commands[i].name, commands[i].desc);
 }
 int
 mon_help(int argc, char **argv, struct Trapframe *tf)
@@ -64,7 +65,7 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 }
 
 void
-backtrace(void){
+print_backtrace(void){
         int i;
         uint32_t *ebp, *eip;
         struct Eipdebuginfo info;
@@ -112,7 +113,7 @@ backtrace(void){
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
-        backtrace();
+        print_backtrace();
 	return 0;
 }
 
@@ -196,7 +197,7 @@ runcmd(char *buf, struct Trapframe *tf)
 		if (strcmp(argv[0], commands[i].name) == 0)
 			return commands[i].func(argc, argv, tf);
 	}
-	cprintf("Error: unknown command '%s'. Available commands are:\n", argv[0]);
+	cprintf("Error: unknown command '%s'. \nAvailable commands are:\n", argv[0]);
         __mon_help();
 	return 0;
 }

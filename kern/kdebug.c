@@ -11,6 +11,14 @@ extern const char __STABSTR_BEGIN__[];		// Beginning of string table
 extern const char __STABSTR_END__[];		// End of string table
 
 
+struct UserStabData {
+	const struct Stab *stabs;
+	const struct Stab *stab_end;
+	const char *stabstr;
+	const char *stabstr_end;
+};
+
+
 // stab_binsearch(stabs, region_left, region_right, type, addr)
 //
 //	Some stab types are arranged in increasing order by instruction
@@ -41,7 +49,7 @@ extern const char __STABSTR_END__[];		// End of string table
 //		118    SO     f0100178
 //		555    SO     f0100652
 //		556    SO     f0100654
-//		661    SO     f0100849
+//		657    SO     f0100849
 //	this code:
 //		left = 0, right = 657;
 //		stab_binsearch(stabs, &left, &right, N_SO, 0xf0100184);
@@ -123,8 +131,24 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 		stabstr = __STABSTR_BEGIN__;
 		stabstr_end = __STABSTR_END__;
 	} else {
-		// Can't search for user-level addresses yet!
-  	        panic("User address");
+		// The user-application linker script, user/user.ld,
+		// puts information about the application's stabs (equivalent
+		// to __STAB_BEGIN__, __STAB_END__, __STABSTR_BEGIN__, and
+		// __STABSTR_END__) in a structure located at virtual address
+		// USTABDATA.
+		const struct UserStabData *usd = (const struct UserStabData *) USTABDATA;
+
+		// Make sure this memory is valid.
+		// Return -1 if it is not.  Hint: Call user_mem_check.
+		// LAB 3: Your code here.
+
+		stabs = usd->stabs;
+		stab_end = usd->stab_end;
+		stabstr = usd->stabstr;
+		stabstr_end = usd->stabstr_end;
+
+		// Make sure the STABS and string table memory is valid.
+		// LAB 3: Your code here.
 	}
 
 	// String table validity checks
