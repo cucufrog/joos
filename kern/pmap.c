@@ -159,6 +159,7 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+        envs = (struct Env *) boot_alloc(NENV * sizeof(struct Env));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -183,6 +184,7 @@ mem_init(void)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
         boot_map_region(kern_pgdir, (uintptr_t) UPAGES, npages * sizeof(struct Page), PADDR(pages), PTE_W | PTE_P);
+        kern_pgdir[PDX(UPAGES)] = PTE_ADDR(kern_pgdir[PDX(UPAGES)]) | PTE_U | PTE_P;
 
 	//////////////////////////////////////////////////////////////////////
 	// Map the 'envs' array read-only by the user at linear address UENVS
@@ -191,6 +193,8 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+        boot_map_region(kern_pgdir, (uintptr_t) UENVS, NENV * sizeof(struct Env), PADDR(envs), PTE_U | PTE_P);
+        kern_pgdir[PDX(UENVS)] = PTE_ADDR(kern_pgdir[PDX(UENVS)]) | PTE_U | PTE_P;
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -204,6 +208,7 @@ mem_init(void)
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
         boot_map_region(kern_pgdir, (uintptr_t) KSTACKTOP -KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W | PTE_P);
+        kern_pgdir[PDX(UENVS)] = PTE_ADDR(kern_pgdir[PDX(UENVS)]) | PTE_U | PTE_P;
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
@@ -214,6 +219,10 @@ mem_init(void)
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
         boot_map_region(kern_pgdir, (uintptr_t) KERNBASE, 0xffffffff - KERNBASE, 0x0, PTE_W | PTE_P);
+        for (n = PDX(KERNBASE); n <= PDX(0xffffffff); n++) {
+            kern_pgdir[n] = PTE_ADDR(kern_pgdir[n]) | PTE_W | PTE_P;
+        }
+        
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -390,7 +399,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
             pp->pp_ref++;
 
             // insert page table into pgdir
-            pde = page2pa(pp) | PTE_P | PTE_W;
+            pde = page2pa(pp) | PTE_P;
             pgdir[PDX(va)] = pde;
 
             //cprintf("debug: pgdir_walk: PTE_ADDR %x\n", pde);
@@ -617,7 +626,7 @@ static void
 check_page_free_list(bool only_low_memory)
 {
 	struct Page *pp;
-	int pdx_limit = only_low_memory ? 1 : NPDENTRIES;
+        unsigned pdx_limit = only_low_memory ? 1 : NPDENTRIES;
 	int nfree_basemem = 0, nfree_extmem = 0;
 	char *first_free_page;
 
@@ -795,6 +804,7 @@ check_kern_pgdir(void)
 		default:
 			if (i >= PDX(KERNBASE)) {
 				assert(pgdir[i] & PTE_P);
+                                cprintf("debug: %d\n", i);
 				assert(pgdir[i] & PTE_W);
 			} else
 				assert(pgdir[i] == 0);
