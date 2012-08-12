@@ -3,3 +3,4 @@ obj/
 tags
 Session.vim
 *.orig
+.dir-locals.el
