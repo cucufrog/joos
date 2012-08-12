@@ -49,7 +49,7 @@ i386_detect_memory(void)
 	else
 		npages = npages_basemem;
 
-	cprintf("Physical memory: %uK available, base = %uK, extended = %uK\n",
+	cprintf("JOOS: Physical memory: %uK available, base = %uK, extended = %uK\n",
 		npages * PGSIZE / 1024,
 		npages_basemem * PGSIZE / 1024,
 		npages_extmem * PGSIZE / 1024);
@@ -193,7 +193,7 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
-        boot_map_region(kern_pgdir, (uintptr_t) UENVS, NENV * sizeof(struct Env), PADDR(envs), PTE_U | PTE_P);
+        boot_map_region(kern_pgdir, (uintptr_t) UENVS, NENV * sizeof(struct Env), PADDR(envs), PTE_W | PTE_P);
         kern_pgdir[PDX(UENVS)] = PTE_ADDR(kern_pgdir[PDX(UENVS)]) | PTE_U | PTE_P;
 
 	//////////////////////////////////////////////////////////////////////
@@ -207,8 +207,7 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
-        boot_map_region(kern_pgdir, (uintptr_t) KSTACKTOP -KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W | PTE_P);
-        kern_pgdir[PDX(UENVS)] = PTE_ADDR(kern_pgdir[PDX(UENVS)]) | PTE_U | PTE_P;
+        boot_map_region(kern_pgdir, (uintptr_t) KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
@@ -804,7 +803,7 @@ check_kern_pgdir(void)
 		default:
 			if (i >= PDX(KERNBASE)) {
 				assert(pgdir[i] & PTE_P);
-                                cprintf("debug: %d\n", i);
+                                //cprintf("debug: %d\n", i);
 				assert(pgdir[i] & PTE_W);
 			} else
 				assert(pgdir[i] == 0);

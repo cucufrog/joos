@@ -65,6 +65,7 @@ trap_init(void)
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+        cprintf("JOOS: trap_init not implement yet\n");
 
 	// Per-CPU setup 
 	trap_init_percpu();

@@ -118,16 +118,15 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 }
 
 void 
-print_pgdir()
+print_pgdir(pde_t *pgdir)
 {
-    //pde_t *kern_pgdir = (pde_t *) UVPT;
-    extern pde_t *kern_pgdir;
+    //pde_t *pgdir = (pde_t *) UVPT;
     size_t pdx, ptx;
 
-    //kern_pgdir = (pde_t *)PADDR(kern_pgdir);
+    //pgdir = (pde_t *)PADDR(pgdir);
     cprintf(" pdx\t va\tpa\t\tperm\n");
     for (pdx=0; pdx<NPDENTRIES; ++pdx) {
-        pde_t pgtbl = kern_pgdir[pdx];
+        pde_t pgtbl = pgdir[pdx];
         if (pgtbl & PTE_P) {
             uintptr_t va = pdx << 22;
             physaddr_t pa = PTE_ADDR(pgtbl);
@@ -151,7 +150,7 @@ print_pgdir()
 int
 mon_pgdir(int argc, char **argv, struct Trapframe *tf)
 {
-        print_pgdir();
+        print_pgdir(kern_pgdir);
 	return 0;
 }
 

@@ -4,6 +4,8 @@
 # error "This is a JOS kernel header; user programs should not #include it"
 #endif
 
+#include"inc/memlayout.h"
+
 struct Trapframe;
 
 // Activate the kernel monitor,
@@ -18,7 +20,7 @@ int mon_backtrace(int argc, char **argv, struct Trapframe *tf);
 int mon_pgdir(int argc, char **argv, struct Trapframe *tf);
 
 // utils
-void print_pgdir(void);
+void print_pgdir(pde_t *pgdir);
 void print_backtrace(void);
 
 

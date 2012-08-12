@@ -49,9 +49,12 @@ i386_init(void)
 	//	monitor(NULL);
 
 	// Lab 3 user environment initialization functions
+	cprintf("JOOS: init env ...\n");
 	env_init();
+	cprintf("JOOS: init trap ...\n");
 	trap_init();
 
+	cprintf("JOOS: env create...\n");
 #if defined(TEST)
 	// Don't touch -- used by grading script!
 	ENV_CREATE(TEST, ENV_TYPE_USER);
@@ -61,6 +64,7 @@ i386_init(void)
 #endif // TEST*
 
 	// We only have one user environment for now, so just run it.
+	cprintf("JOOS: env run...\n");
 	env_run(&envs[0]);
 }
 
