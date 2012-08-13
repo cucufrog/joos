@@ -6,6 +6,7 @@
 #include <inc/string.h>
 #include <inc/assert.h>
 #include <inc/elf.h>
+#include <inc/types.h>
 
 #include <kern/env.h>
 #include <kern/pmap.h>
@@ -207,6 +208,7 @@ env_setup_vm(struct Env *e)
         for (i = PDX(KERNBASE); i <= PDX(0xffffffff); i++) {
             e->env_pgdir[i] = kern_pgdir[i];
         }
+        //print_pgdir(e->env_pgdir);
         
 
 	// UVPT maps the env's own page table read-only.
@@ -237,6 +239,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	// Allocate and set up the page directory for this environment.
 	if ((r = env_setup_vm(e)) < 0)
 		return r;
+        //print_user_pgtbl(e->env_pgdir);
 
 	// Generate an env_id for this environment.
 	generation = (e->env_id + (1 << ENVGENSHIFT)) & ~(NENV - 1);
@@ -287,7 +290,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 // Panic if any allocation attempt fails.
 //
 static void
-region_alloc(struct Env *e, void *va, size_t len)
+region_alloc_load(struct Env *e, uintptr_t binary_seg_start_kva, struct Proghdr *ph)
 {
 	// LAB 3: Your code here.
 	// (But only if you need it for load_icode.)
@@ -296,7 +299,48 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
-        uintptr_t start = (uintptr_t) va;
+        uint32_t len = ph->p_memsz;
+        uintptr_t start = ph->p_va;
+        uintptr_t end = start + ph->p_memsz;
+        uintptr_t page_start, page_end;
+        size_t i;
+        struct Page *pp;
+
+        if (len == 0) {
+            panic("region_alloc: trying to alloc 0 length memory");
+        }
+        page_start = ROUNDDOWN(start, PGSIZE);
+        page_end = ROUNDUP(end, PGSIZE);
+        if (page_start >= UTOP || page_end >= UTOP) {
+            panic("region_alloc: trying to alloc memory above UTOP");
+        }
+        for(i = 0; i < (page_end - page_start)/PGSIZE; i++) {
+            pp = page_alloc(ALLOC_ZERO);
+            if (pp == NULL) {
+                panic("region alloc out of memory");
+            }
+            page_insert(e->env_pgdir, pp, (void *)(page_start+i*PGSIZE), PTE_P | PTE_U | PTE_W);
+            //print_pgdir(e->env_pgdir);
+            
+            // copy segment
+            // be careful of the two address mappings, kern_pgdir and env_pgdir
+            // we want to modify physical address mapped in both pgdir
+            //env_seg_start_kva = (uintptr_t)KADDR(PTE_ADDR(*pgdir_walk(e->env_pgdir, (void *)program_header->p_va, 0)));
+            memmove((void *)page2kva(pp), (void *)ROUNDDOWN(binary_seg_start_kva+i*PGSIZE, PGSIZE), PGSIZE);
+
+            // init zero region
+            if ((i+1)*PGSIZE > ph->p_filesz) {
+                uintptr_t zero_cur = MAX(ph->p_filesz, i*PGSIZE);
+                uintptr_t zero_start_pgoff = zero_cur - ROUNDDOWN(zero_cur, PGSIZE);
+                memset(page2kva(pp)+zero_start_pgoff, 0, PGSIZE-zero_start_pgoff);
+            }
+        }
+}
+
+static void
+region_alloc(struct Env *e, void *va, uint32_t len)
+{
+        uintptr_t start = (uintptr_t)va;
         uintptr_t end = start + len;
         uintptr_t page_start, page_end;
         size_t i;
@@ -310,15 +354,16 @@ region_alloc(struct Env *e, void *va, size_t len)
         if (page_start >= UTOP || page_end >= UTOP) {
             panic("region_alloc: trying to alloc memory above UTOP");
         }
-        for(i = 0; i < (page_end - page_start)%PGSIZE; i++) {
-            pp = page_alloc(0);
+        for(i = 0; i < (page_end - page_start)/PGSIZE; i++) {
+            pp = page_alloc(ALLOC_ZERO);
             if (pp == NULL) {
                 panic("region alloc out of memory");
             }
             page_insert(e->env_pgdir, pp, (void *)(page_start+i*PGSIZE), PTE_P | PTE_U | PTE_W);
+            //print_pgdir(e->env_pgdir);
+            
         }
 }
-
 //
 // Set up the initial program binary, stack, and processor flags
 // for a user process.
@@ -379,6 +424,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
         // a segment may have larger size in memory than in file
         // because memory initialized to zero do not need to be in file
         uintptr_t env_seg_start_kva;
+        int i;
         uintptr_t binary_seg_start_kva; // kernel virtual address in kernel image
 
         if (elf_header == NULL)
@@ -391,6 +437,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
         program_header = (struct Proghdr *) ((uint8_t *) elf_header + elf_header->e_phoff);
         program_header_end = program_header + elf_header->e_phnum;
 
+        //print_pgdir(e->env_pgdir);
 	for (; program_header < program_header_end; program_header++) {
 
                 if (program_header->p_offset >= size)
@@ -400,18 +447,16 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 
                 binary_seg_start_kva = (uintptr_t)binary + program_header->p_offset;
 
-                print_pgdir(e->env_pgdir);
+                //print_pgdir(e->env_pgdir);
+
                 // alloc physical mem and setup e->env_pgdir
-                region_alloc(e, (void *)program_header->p_va, program_header->p_memsz);
 
-                print_pgdir(e->env_pgdir);
+                //print_user_pgtbl(e->env_pgdir);
+                region_alloc_load(e, binary_seg_start_kva,program_header);
+                //print_user_pgtbl(e->env_pgdir);
 
-                // copy segment
-                env_seg_start_kva = (uintptr_t)KADDR(PTE_ADDR(*pgdir_walk(e->env_pgdir, (void *)program_header->p_va, 0)));
-                memmove((void *)env_seg_start_kva, (void *)binary_seg_start_kva, program_header->p_filesz);
+                //print_user_pgtbl(e->env_pgdir);
 
-                // init zero region
-                memset((void *)env_seg_start_kva+program_header->p_filesz, 0, program_header->p_memsz - program_header->p_filesz);
         }
 
 	// Now map one page for the program's initial stack
@@ -419,6 +464,8 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 
 	// LAB 3: Your code here.
         region_alloc(e, (void *)(USTACKTOP - PGSIZE), PGSIZE);
+        //print_user_pgtbl(e->env_pgdir);
+        //print_pgdir(e->env_pgdir);
 
         // setup entry point
         e->env_tf.tf_eip = elf_header->e_entry;
@@ -437,13 +484,23 @@ env_create(uint8_t *binary, size_t size, enum EnvType type)
 	// LAB 3: Your code here.
         struct Env *env;
         int ret;
+        pte_t *ppte;
 
         ret = env_alloc(&env, 0);
         if (ret < 0)
             panic("env_create: error: %e", ret);
 
         env->env_type = type;
+
+        //print_user_pgtbl(env->env_pgdir);
+
         load_icode(env, binary, size);
+        print_pgdir(env->env_pgdir);
+        print_pgdir(kern_pgdir);
+        ppte = pgdir_walk(env->env_pgdir, (void *)0x0f01046d4, 0);
+        cprintf("pte: %x\n", *ppte);
+        ppte = pgdir_walk(kern_pgdir, (void *)0x0f01046d4, 0);
+        cprintf("pte: %x\n", *ppte);
 }
 
 //
@@ -565,7 +622,10 @@ env_run(struct Env *e)
         curenv = e;
         curenv->env_status = ENV_RUNNING;
         curenv->env_runs ++;
-        lcr3((uintptr_t)curenv->env_pgdir);
+        //print_pgdir(curenv->env_pgdir);
+        lcr3(PADDR(curenv->env_pgdir));
+        //lcr3(PADDR(kern_pgdir));
+        //panic("debug");
 
         env_pop_tf(&curenv->env_tf);
 	//panic("env_run not yet implemented");

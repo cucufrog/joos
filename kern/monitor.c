@@ -118,10 +118,39 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 }
 
 void 
+print_user_pgtbl(pde_t *pgdir)
+{
+    //pde_t *pgdir = (pde_t *) UVPT;
+    size_t pdx, ptx;
+
+    //pgdir = (pde_t *)PADDR(pgdir);
+    cprintf(" pdx\t va\tpa\t\tperm\n");
+    for (pdx=0; pdx<PDX(UTOP); ++pdx) {
+        pde_t pgtbl = pgdir[pdx];
+        if (pgtbl & PTE_P) {
+            uintptr_t va = pdx << 22;
+            physaddr_t pa = PTE_ADDR(pgtbl);
+            size_t perm = pgtbl & 0xfff;
+            cprintf("%4d\t%x\t%x\t%x\n", pdx, va, pa, perm);
+            for (ptx=0; ptx<NPTENTRIES; ++ptx) {
+                pte_t pte = ((pte_t *)KADDR(PTE_ADDR(pgtbl)))[ptx];
+                if (pte & PTE_P) {
+                    physaddr_t pa = PTE_ADDR(pte);
+                    size_t perm = pte & 0xfff;
+                    uintptr_t va = pdx << 22 | ptx << 12;
+                    cprintf("- %4d\t%x\t%x\t%x\n", ptx, va, pa, perm);
+                }
+            }
+        }
+    }
+    
+}
+void 
 print_pgdir(pde_t *pgdir)
 {
     //pde_t *pgdir = (pde_t *) UVPT;
     size_t pdx, ptx;
+    int i;
 
     //pgdir = (pde_t *)PADDR(pgdir);
     cprintf(" pdx\t va\tpa\t\tperm\n");
@@ -132,17 +161,19 @@ print_pgdir(pde_t *pgdir)
             physaddr_t pa = PTE_ADDR(pgtbl);
             size_t perm = pgtbl & 0xfff;
             cprintf("%4d\t%x\t%x\t%x\n", pdx, va, pa, perm);
-            /*
+            i = 0;
             for (ptx=0; ptx<NPTENTRIES; ++ptx) {
-                pte_t pte = ((pte_t *)PTE_ADDR(pgtbl))[ptx];
+                pte_t pte = ((pte_t *)KADDR(PTE_ADDR(pgtbl)))[ptx];
                 if (pte & PTE_P) {
-                    physaddr_t pa = PTE_ADDR(pte);
-                    size_t perm = pte & 0xfff;
-                    uintptr_t va = pdx << 22 | ptx << 12;
-                    cprintf("%4d\t%4d\t%x\t%x\t%x\n", pdx, ptx, va, pa, perm);
+                    //physaddr_t pa = PTE_ADDR(pte);
+                    //size_t perm = pte & 0xfff;
+                    //uintptr_t va = pdx << 22 | ptx << 12;
+                    //cprintf("- %4d\t%x\t%x\t%x\n", ptx, va, pa, perm);
+                    i++;
                 }
             }
-            */
+            if (i>0)
+                cprintf("- %d\n", i);
         }
     }
     

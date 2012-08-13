@@ -21,6 +21,7 @@ int mon_pgdir(int argc, char **argv, struct Trapframe *tf);
 
 // utils
 void print_pgdir(pde_t *pgdir);
+void print_user_pgtbl(pde_t *pgdir);
 void print_backtrace(void);
 
 

@@ -9,6 +9,7 @@
 #include <kern/pmap.h>
 #include <kern/kclock.h>
 #include <kern/env.h>
+#include <kern/monitor.h>
 
 // These variables are set by i386_detect_memory()
 size_t npages;			// Amount of physical memory (in pages)
@@ -20,7 +21,6 @@ struct Page *pages;		// Physical page state array
 static struct Page *page_free_list;	// Free list of physical pages
 
 
-extern void print_pgdir(void);
 
 // --------------------------------------------------------------
 // Detect machine's physical memory setup.
@@ -245,6 +245,7 @@ mem_init(void)
 	lcr0(cr0);
 
 	// Some more checks, only possible after kern_pgdir is installed.
+        //print_user_pgtbl(kern_pgdir);
 	check_page_installed_pgdir();
 }
 
@@ -401,6 +402,8 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
             pde = page2pa(pp) | PTE_P;
             pgdir[PDX(va)] = pde;
 
+            //print_pgdir(pgdir);
+
             //cprintf("debug: pgdir_walk: PTE_ADDR %x\n", pde);
             pgtbl =  (pte_t *) KADDR(PTE_ADDR(pde));
 
@@ -466,6 +469,10 @@ page_insert(pde_t *pgdir, struct Page *pp, void *va, int perm)
 {
 	// Fill this function in
         pte_t *ppte = pgdir_walk(pgdir, va, 1);
+        pgdir[PDX(va)] |= PTE_W;
+
+
+        //print_pgdir(pgdir);
         if (ppte == NULL) {
             return -E_NO_MEM;
             warn("page_insert: NULL pte pointer!");
@@ -482,9 +489,11 @@ page_insert(pde_t *pgdir, struct Page *pp, void *va, int perm)
                 pp->pp_ref--;
             }
         }
-        pgdir[PDX(va)] |= perm;
+        pgdir[PDX(va)] &= ~0xfff; // clear bits
+        pgdir[PDX(va)] |= perm | PTE_P;
         *ppte = page2pa(pp) | perm | PTE_P;
-        //warn("insert %x!!! perm %x\n", *ppte, perm);
+        //warn("&pgdir[PDX(va)]: %x; ppte: %x; *ppte: %x; perm %x\n", &pgdir[PDX(va)], ppte, *ppte, perm);
+        //print_user_pgtbl(pgdir);
         pp->pp_ref++;
         tlb_invalidate(pgdir, va);
 	return 0;
