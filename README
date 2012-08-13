@@ -1,10 +1,11 @@
-The Joos Operating System 
+The JOOS Operating System 
 
-## Introduction
-This is a prototype operating system developed by Jiannan Ouyang (ouyang@cs.pitt.edu), 
-based on skeleton code from MIT JOS (http://pdos.csail.mit.edu/6.828/).
+* Introduction
+The JOOS Operating System is a prototype operating system developed by Jiannan Ouyang (ouyang@cs.pitt.edu), 
+and named after his initial. Skeleton code was from the MIT 6.828 Operating System Engineering course project.
+(http://pdos.csail.mit.edu/6.828/).
 
-## Code Organization
+* Code Organization
 boot/: simple boot loader which load the kernel from 1st sector of 1st disk
 conf/: configuration information for Makefile
 inc/: kernel header files
